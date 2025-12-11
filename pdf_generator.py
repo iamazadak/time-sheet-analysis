@@ -320,14 +320,14 @@ def create_timesheet_report(df, metrics, charts, config):
     Helper function to create timesheet analytics report
     
     Args:
-        df: Main dataframe
+        df: Main dataframe (deprecated, use config['tables'] instead)
         metrics: Dictionary of summary metrics
         charts: List of plotly figures with titles
         config: Report configuration dict with keys:
             - page_size: str
             - orientation: str
             - include_cover: bool
-            - include_tables: list of table names to include
+            - tables: list of table dicts with 'name', 'df', 'title'
             
     Returns:
         BytesIO buffer with PDF
@@ -359,19 +359,21 @@ def create_timesheet_report(df, metrics, charts, config):
             }
         })
         
-    # Tables
-    include_tables = config.get('include_tables', [])
-    if 'raw_data' in include_tables and df is not None:
+    # Tables from new structure
+    tables = config.get('tables', [])
+    if tables:
         sections.append({'type': 'pagebreak'})
-        sections.append({
-            'type': 'table',
-            'data': {
-                'df': df,
-                'title': 'Raw Timesheet Data',
-                'max_rows': 100
-            }
-        })
         
+        for table_info in tables:
+            sections.append({
+                'type': 'table',
+                'data': {
+                    'df': table_info['df'],
+                    'title': table_info.get('title', 'Data Table'),
+                    'max_rows': 100 if table_info['name'] == 'raw_data' else 50
+                }
+            })
+            
     # Generate report
     buffer = io.BytesIO()
     generator.generate_report(
@@ -382,3 +384,4 @@ def create_timesheet_report(df, metrics, charts, config):
     
     buffer.seek(0)
     return buffer
+

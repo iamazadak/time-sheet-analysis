@@ -183,20 +183,85 @@ if st.sidebar.button("📥 Generate PDF Report", type="primary", use_container_w
                 'title': 'Billable vs Non-Billable Hours'
             })
             
+            # Prepare tables based on checkbox selections
+            tables_to_include = []
+            
+            # Summary Metrics Table
+            if include_summary_table:
+                summary_df = pd.DataFrame({
+                    'Metric': list(metrics.keys()),
+                    'Value': list(metrics.values())
+                })
+                tables_to_include.append({
+                    'name': 'summary_metrics',
+                    'df': summary_df,
+                    'title': 'Summary Metrics'
+                })
+            
+            # Trainer Performance Table
+            if include_trainer_table:
+                # Create trainer performance summary
+                trainer_stats = []
+                for trainer in df_filtered['Employee Name'].unique():
+                    trainer_df = df_filtered[df_filtered['Employee Name'] == trainer]
+                    total_mins = trainer_df['Work Time (Mins)'].sum()
+                    
+                    # Training hours
+                    training_keywords = ['Training', 'Session', 'Delivery', 'Facilitation']
+                    train_mins = trainer_df[trainer_df['Activity Category'].apply(
+                        lambda x: any(k.lower() in str(x).lower() for k in training_keywords)
+                    )]['Work Time (Mins)'].sum()
+                    
+                    # Billable hours
+                    billable_mins = trainer_df[trainer_df['Is_Billable']]['Work Time (Mins)'].sum()
+                    
+                    # Utilization
+                    capacity_mins = state_params['capacity_mins']
+                    if capacity_mins:
+                        util_score = (billable_mins / capacity_mins * 100)
+                    else:
+                        util_score = (billable_mins / total_mins * 100) if total_mins > 0 else 0
+                    
+                    trainer_stats.append({
+                        'Trainer': trainer,
+                        'Total Hours': f"{total_mins/60:.1f}",
+                        'Training Hours': f"{train_mins/60:.1f}",
+                        'Billable Hours': f"{billable_mins/60:.1f}",
+                        'Utilization %': f"{util_score:.1f}%"
+                    })
+                
+                trainer_perf_df = pd.DataFrame(trainer_stats)
+                tables_to_include.append({
+                    'name': 'trainer_performance',
+                    'df': trainer_perf_df,
+                    'title': 'Trainer Performance Summary'
+                })
+            
+            # Raw Data Table
+            if include_raw_data:
+                # Select key columns for raw data
+                raw_data_cols = ['Date', 'Employee Name', 'Activity Category', 'Work Time (Mins)', 
+                                'Location', 'Attendance', 'Is_Billable']
+                available_cols = [col for col in raw_data_cols if col in df_filtered.columns]
+                raw_df = df_filtered[available_cols].copy()
+                
+                tables_to_include.append({
+                    'name': 'raw_data',
+                    'df': raw_df,
+                    'title': 'Raw Timesheet Data'
+                })
+            
             # Configure report
             pdf_config = {
                 'page_size': page_size,
                 'orientation': page_orientation,
                 'include_cover': include_cover,
-                'include_tables': []
+                'tables': tables_to_include
             }
-            
-            if include_raw_data:
-                pdf_config['include_tables'].append('raw_data')
                 
             # Generate PDF
             pdf_buffer = pdf_generator.create_timesheet_report(
-                df=df_filtered if include_raw_data else None,
+                df=None,  # Pass tables separately now
                 metrics=metrics,
                 charts=charts,
                 config=pdf_config
