@@ -39,9 +39,35 @@ Thumbs.db
 
 # Streamlit
 .streamlit/secrets.toml
+.streamlit/config.toml
+
+# Environment Variables & Secrets
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+*.p12
+*.pfx
+secrets.json
+credentials.json
+service-account*.json
 
 # Data files (optional - remove if you want to include CSV)
 # *.csv
 
 # Logs
 *.log
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.swp
+*~.nib
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+

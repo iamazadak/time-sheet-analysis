@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+from datetime import datetime
 import data_processor
 import analysis_productivity
 import analysis_activities
@@ -9,6 +10,7 @@ import analysis_travel
 import analysis_location
 import analysis_attendance
 import analysis_trends
+import pdf_generator
 
 # Page Config
 st.set_page_config(page_title="Team Productivity & Insights", layout="wide", page_icon="📊")
@@ -74,6 +76,32 @@ st.sidebar.header("⚙️ Configuration")
 working_days = st.sidebar.number_input("Working Days (in Range/Month)", min_value=1, max_value=31, value=22, step=1)
 working_hours = st.sidebar.number_input("Daily Working Hours", min_value=1, max_value=12, value=8, step=1)
 
+st.sidebar.divider()
+st.sidebar.header("📄 PDF Export Options")
+
+# Page Size Selection
+page_size = st.sidebar.selectbox(
+    "Page Size",
+    options=['A0', 'A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'Letter', 'Legal'],
+    index=4  # Default to A4
+)
+
+# Page Orientation
+page_orientation = st.sidebar.radio(
+    "Page Orientation",
+    options=['Portrait', 'Landscape'],
+    horizontal=True
+)
+
+# Cover Page Option
+include_cover = st.sidebar.checkbox("Include Cover Page", value=True)
+
+# Table Inclusion Options
+st.sidebar.markdown("**Include Tables:**")
+include_raw_data = st.sidebar.checkbox("Raw Data Table", value=False)
+include_summary_table = st.sidebar.checkbox("Summary Metrics Table", value=True)
+include_trainer_table = st.sidebar.checkbox("Trainer Performance Table", value=True)
+
 # Global Color Theme (Stronger/Richer ~80%)
 # Avoid: Pink, Grey, Light Yellow
 pastel_colors = px.colors.qualitative.Bold 
@@ -105,6 +133,89 @@ if sel_employees:
 if df_filtered.empty:
     st.warning("No data matches the selected filters.")
     st.stop()
+
+# PDF Generation Button
+st.sidebar.divider()
+if st.sidebar.button("📥 Generate PDF Report", type="primary", use_container_width=True):
+    with st.spinner("Generating PDF Report..."):
+        try:
+            # Collect metrics
+            total_hours = df_filtered['Work Time (Mins)'].sum() / 60
+            training_hours = analysis_training.get_training_metrics(df_filtered)[0].sum() / 60
+            active_trainers = df_filtered['Employee Name'].nunique()
+            avg_utilization = (training_hours / total_hours * 100) if total_hours > 0 else 0
+            
+            metrics = {
+                'Total Logged Hours': f"{total_hours:,.1f} h",
+                'Total Training Hours': f"{training_hours:,.1f} h",
+                'Active Trainers': active_trainers,
+                'Average Training Utilization': f"{avg_utilization:.1f}%",
+                'Date Range': f"{start_date} to {end_date}",
+                'Locations': ', '.join(sel_locations) if sel_locations else 'All',
+                'Trainers': ', '.join(sel_employees) if len(sel_employees) <= 5 else f"{len(sel_employees)} trainers"
+            }
+            
+            # Collect charts
+            charts = []
+            
+            # Utilization chart
+            charts.append({
+                'fig': analysis_productivity.plot_utilization_rate_lollipop(df_filtered, capacity_mins=state_params['capacity_mins'], colors=state_params['colors']),
+                'title': 'Utilization Score by Trainer'
+            })
+            
+            # Activity treemap
+            activity_color_map = analysis_activities.get_activity_color_map(df_filtered)
+            charts.append({
+                'fig': analysis_activities.plot_activity_treemap(df_filtered, color_map=activity_color_map),
+                'title': 'Time Investment by Activity'
+            })
+            
+            # Weekly trends
+            charts.append({
+                'fig': analysis_trends.get_weekly_summary(df_filtered, colors=state_params['colors']),
+                'title': 'Weekly Work Trends'
+            })
+            
+            # Billable vs Non-billable
+            charts.append({
+                'fig': analysis_productivity.plot_billable_vs_non_billable(df_filtered, colors=state_params['colors']),
+                'title': 'Billable vs Non-Billable Hours'
+            })
+            
+            # Configure report
+            pdf_config = {
+                'page_size': page_size,
+                'orientation': page_orientation,
+                'include_cover': include_cover,
+                'include_tables': []
+            }
+            
+            if include_raw_data:
+                pdf_config['include_tables'].append('raw_data')
+                
+            # Generate PDF
+            pdf_buffer = pdf_generator.create_timesheet_report(
+                df=df_filtered if include_raw_data else None,
+                metrics=metrics,
+                charts=charts,
+                config=pdf_config
+            )
+            
+            # Download button
+            st.sidebar.download_button(
+                label="⬇️ Download PDF",
+                data=pdf_buffer,
+                file_name=f"timesheet_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+                mime="application/pdf",
+                use_container_width=True
+            )
+            
+            st.sidebar.success("✅ PDF Generated Successfully!")
+            
+        except Exception as e:
+            st.sidebar.error(f"Error generating PDF: {str(e)}")
+            st.sidebar.exception(e)
 
 # --- TABS ---
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
