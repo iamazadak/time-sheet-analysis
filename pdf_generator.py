@@ -12,7 +12,9 @@ from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from datetime import datetime
 import io
 import plotly.graph_objects as go
+import plotly.io as pio
 import pandas as pd
+import base64
 
 # Page Size Mapping
 PAGE_SIZES = {
@@ -221,6 +223,7 @@ class PDFReportGenerator:
     def add_chart_image(self, fig, title="Chart", width=6*inch, height=4*inch):
         """
         Convert Plotly figure to image and add to PDF
+        Falls back to chart description if image conversion fails
         
         Args:
             fig: Plotly figure object
@@ -236,11 +239,22 @@ class PDFReportGenerator:
         story.append(Paragraph(title, self.styles['CustomSubtitle']))
         story.append(Spacer(1, 0.2*inch))
         
-        # Convert plotly figure to image
-        img_bytes = fig.to_image(format="png", width=800, height=600)
-        img = Image(io.BytesIO(img_bytes), width=width, height=height)
-        
-        story.append(img)
+        try:
+            # Try to convert plotly figure to image using kaleido
+            img_bytes = pio.to_image(fig, format="png", width=800, height=600, engine="kaleido")
+            img = Image(io.BytesIO(img_bytes), width=width, height=height)
+            story.append(img)
+        except Exception as e:
+            # Fallback: Add a note that chart is not available in PDF
+            note = f"""
+            <para>
+            <i>[Chart: {title}]</i><br/>
+            <b>Note:</b> Chart visualization is available in the web dashboard.<br/>
+            Chart cannot be embedded in PDF due to server limitations.
+            </para>
+            """
+            story.append(Paragraph(note, self.styles['Normal']))
+            
         story.append(Spacer(1, 0.3*inch))
         
         return story
