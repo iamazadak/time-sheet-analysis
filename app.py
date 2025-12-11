@@ -159,6 +159,18 @@ include_raw_data = st.sidebar.checkbox("Raw Data Table", value=False)
 include_summary_table = st.sidebar.checkbox("Summary Metrics Table", value=True)
 include_trainer_table = st.sidebar.checkbox("Trainer Performance Table", value=True)
 
+# Chart Inclusion Options
+st.sidebar.markdown("**Include Charts:**")
+include_utilization_chart = st.sidebar.checkbox("Utilization Score Chart", value=True)
+include_activity_treemap = st.sidebar.checkbox("Activity Treemap", value=True)
+include_weekly_trends = st.sidebar.checkbox("Weekly Trends Chart", value=True)
+include_billable_chart = st.sidebar.checkbox("Billable vs Non-Billable Chart", value=True)
+include_activity_stacked = st.sidebar.checkbox("Activity Stacked Bar Chart", value=False)
+include_training_leaderboard = st.sidebar.checkbox("Training Leaderboard", value=False)
+include_online_offline = st.sidebar.checkbox("Online vs Offline Chart", value=False)
+include_travel_efficiency = st.sidebar.checkbox("Travel Efficiency Chart", value=False)
+include_location_performance = st.sidebar.checkbox("Location Performance Chart", value=False)
+
 # Global Color Theme
 pastel_colors = px.colors.qualitative.Bold 
 cust_pastel = ['#008B8B', '#4169E1', '#228B22', '#DAA520', '#800080', '#CC5500', '#20B2AA', '#4682B4', '#556B2F']
@@ -204,33 +216,74 @@ if st.sidebar.button("📥 Generate PDF Report", type="primary", use_container_w
                 'Trainers': ', '.join(sel_employees) if len(sel_employees) <= 5 else f"{len(sel_employees)} trainers"
             }
             
-            # Collect charts
+            # Collect charts based on checkbox selections
             charts = []
+            activity_color_map = analysis_activities.get_activity_color_map(df_filtered)
             
             # Utilization chart
-            charts.append({
-                'fig': analysis_productivity.plot_utilization_rate_lollipop(df_filtered, capacity_mins=state_params['capacity_mins'], colors=state_params['colors']),
-                'title': 'Utilization Score by Trainer'
-            })
+            if include_utilization_chart:
+                charts.append({
+                    'fig': analysis_productivity.plot_utilization_rate_lollipop(df_filtered, capacity_mins=state_params['capacity_mins'], colors=state_params['colors']),
+                    'title': 'Utilization Score by Trainer'
+                })
             
             # Activity treemap
-            activity_color_map = analysis_activities.get_activity_color_map(df_filtered)
-            charts.append({
-                'fig': analysis_activities.plot_activity_treemap(df_filtered, color_map=activity_color_map),
-                'title': 'Time Investment by Activity'
-            })
+            if include_activity_treemap:
+                charts.append({
+                    'fig': analysis_activities.plot_activity_treemap(df_filtered, color_map=activity_color_map),
+                    'title': 'Time Investment by Activity'
+                })
             
             # Weekly trends
-            charts.append({
-                'fig': analysis_trends.get_weekly_summary(df_filtered, colors=state_params['colors']),
-                'title': 'Weekly Work Trends'
-            })
+            if include_weekly_trends:
+                charts.append({
+                    'fig': analysis_trends.get_weekly_summary(df_filtered, colors=state_params['colors']),
+                    'title': 'Weekly Work Trends'
+                })
             
             # Billable vs Non-billable
-            charts.append({
-                'fig': analysis_productivity.plot_billable_vs_non_billable(df_filtered, colors=state_params['colors']),
-                'title': 'Billable vs Non-Billable Hours'
-            })
+            if include_billable_chart:
+                charts.append({
+                    'fig': analysis_productivity.plot_billable_vs_non_billable(df_filtered, colors=state_params['colors']),
+                    'title': 'Billable vs Non-Billable Hours'
+                })
+            
+            # Activity Stacked Bar
+            if include_activity_stacked:
+                charts.append({
+                    'fig': analysis_activities.plot_activity_stacked_bar(df_filtered, color_map=activity_color_map),
+                    'title': 'Activity Distribution by Trainer'
+                })
+            
+            # Training Leaderboard
+            if include_training_leaderboard:
+                tr_mins, tr_sess, tr_df = analysis_training.get_training_metrics(df_filtered)
+                charts.append({
+                    'fig': analysis_training.plot_training_leaderboard(tr_mins, colors=state_params['colors']),
+                    'title': 'Training Hours Leaderboard'
+                })
+            
+            # Online vs Offline
+            if include_online_offline:
+                tr_mins, tr_sess, tr_df = analysis_training.get_training_metrics(df_filtered)
+                charts.append({
+                    'fig': analysis_training.plot_online_vs_offline(tr_df, colors=state_params['colors']),
+                    'title': 'Online vs Offline Training'
+                })
+            
+            # Travel Efficiency
+            if include_travel_efficiency:
+                charts.append({
+                    'fig': analysis_travel.analyze_travel_efficiency(df_filtered, colors=state_params['colors']),
+                    'title': 'Travel Efficiency Analysis'
+                })
+            
+            # Location Performance
+            if include_location_performance:
+                charts.append({
+                    'fig': analysis_location.plot_location_performance(df_filtered, colors=state_params['colors']),
+                    'title': 'Performance by Location'
+                })
             
             # Prepare tables based on checkbox selections
             tables_to_include = []
