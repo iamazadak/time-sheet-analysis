@@ -33,30 +33,81 @@ st.markdown("""
 def load_data(file):
     return data_processor.load_and_clean_data(file)
 
-# Sidebar
-st.sidebar.header("📁 Data & Filters")
-uploaded_file = st.sidebar.file_uploader("Upload Timesheet CSV", type=['csv'])
+# Sidebar - File Upload
+st.sidebar.header("📁 Upload Data")
+uploaded_file = st.sidebar.file_uploader("Upload Timesheet CSV", type=['csv'], help="Upload your timesheet CSV file to begin analysis")
 
-# Default file load
-if uploaded_file is None:
-    default_path = "Time-sheet_2025 - NOV'25.csv"
-    try:
-        df, err = load_data(default_path)
-        if err:
-            st.error(f"Could not load default file: {err}")
-            st.stop()
-        else:
-            st.sidebar.success(f"Loaded default: {default_path}")
-    except Exception as e:
-        st.info("Please upload a CSV file to begin.")
-        st.stop()
-else:
+# Check if data is loaded
+data_loaded = False
+df = None
+
+if uploaded_file is not None:
+    # Load uploaded file
     df, err = load_data(uploaded_file)
     if err:
-        st.error(err)
+        st.sidebar.error(err)
+        st.error(f"❌ Error loading file: {err}")
+        st.info("Please upload a valid CSV file with the required columns.")
         st.stop()
+    else:
+        st.sidebar.success(f"✅ File loaded successfully!")
+        data_loaded = True
+else:
+    # Show welcome screen
+    st.markdown("""
+    ## 👋 Welcome to Timesheet & Productivity Analytics Dashboard
+    
+    ### 📊 Get Started
+    
+    To begin analyzing your timesheet data:
+    
+    1. **Upload your CSV file** using the sidebar uploader
+    2. Or use the **sample data** button below to explore features
+    
+    ### 📋 Required CSV Columns
+    
+    Your CSV file should include:
+    - `Date` - Date of activity
+    - `Employee Name` - Trainer/employee identifier
+    - `Activity Category` - Type of activity
+    - `Work Time (Mins)` - Duration in minutes
+    - `Location` - Work location
+    - `Attendance` - Attendance status (P/L/WO/H/A)
+    
+    ### ✨ Features You'll Access
+    
+    - **Executive Dashboard** - KPIs and high-level metrics
+    - **Deep Dive Analysis** - Detailed productivity insights
+    - **Trainer 360 Profile** - Individual performance analysis
+    - **Raw Data Explorer** - Filter and export data
+    - **PDF Reports** - Customizable report generation
+    """)
+    
+    # Option to load sample data
+    if st.button("📂 Load Sample Data", type="primary", use_container_width=True):
+        default_path = "Time-sheet_2025 - NOV'25.csv"
+        try:
+            df, err = load_data(default_path)
+            if err:
+                st.error(f"Could not load sample file: {err}")
+                st.stop()
+            else:
+                st.sidebar.success(f"✅ Loaded sample: {default_path}")
+                data_loaded = True
+                st.rerun()
+        except Exception as e:
+            st.error(f"Sample data not found: {e}")
+            st.info("Please upload your own CSV file to continue.")
+            st.stop()
+    
+    st.stop()
+
+# === DATA IS LOADED - SHOW ALL FEATURES ===
 
 # Sidebar: Filters
+st.sidebar.divider()
+st.sidebar.header("🔍 Filters")
+
 dates = sorted(df['Date_Obj'].dropna().unique())
 if not dates:
     st.error("No valid dates found in data.")
@@ -70,6 +121,12 @@ start_date, end_date = st.sidebar.date_input(
     min_value=min_date,
     max_value=max_date
 )
+
+locations = sorted(df['Location'].dropna().unique())
+sel_locations = st.sidebar.multiselect("Select Location", locations, default=locations)
+
+employees = sorted(df['Employee Name'].dropna().unique())
+sel_employees = st.sidebar.multiselect("Select Trainers", employees, default=employees)
 
 st.sidebar.divider()
 st.sidebar.header("⚙️ Configuration")
@@ -102,10 +159,8 @@ include_raw_data = st.sidebar.checkbox("Raw Data Table", value=False)
 include_summary_table = st.sidebar.checkbox("Summary Metrics Table", value=True)
 include_trainer_table = st.sidebar.checkbox("Trainer Performance Table", value=True)
 
-# Global Color Theme (Stronger/Richer ~80%)
-# Avoid: Pink, Grey, Light Yellow
+# Global Color Theme
 pastel_colors = px.colors.qualitative.Bold 
-# Custom Palette: Deep Cyan, Royal Blue, Forest Green, Goldenrod, Purple, Burnt Orange
 cust_pastel = ['#008B8B', '#4169E1', '#228B22', '#DAA520', '#800080', '#CC5500', '#20B2AA', '#4682B4', '#556B2F']
 
 state_params = {
@@ -115,17 +170,11 @@ state_params = {
     'colors': cust_pastel
 }
 
-# Filter by Date
+# Filter by Date and Selections
 df_filtered = df[(df['Date_Obj'].dt.date >= start_date) & (df['Date_Obj'].dt.date <= end_date)]
-
-locations = sorted(df_filtered['Location'].dropna().unique())
-sel_locations = st.sidebar.multiselect("Select Location", locations, default=locations)
 
 if sel_locations:
     df_filtered = df_filtered[df_filtered['Location'].isin(sel_locations)]
-
-employees = sorted(df_filtered['Employee Name'].dropna().unique())
-sel_employees = st.sidebar.multiselect("Select Trainers", employees, default=employees)
 
 if sel_employees:
     df_filtered = df_filtered[df_filtered['Employee Name'].isin(sel_employees)]
