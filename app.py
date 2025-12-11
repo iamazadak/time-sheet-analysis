@@ -498,7 +498,7 @@ with tab3:
     selected_trainer = st.selectbox("Select Trainer Profile", employees)
     
     if selected_trainer:
-        trainer_df = df[df['Employee Name'] == selected_trainer].copy()
+        trainer_df = df_filtered[df_filtered['Employee Name'] == selected_trainer].copy()
         
         # Calculate KPIs directly
         total_mins = trainer_df['Work Time (Mins)'].sum()
@@ -523,12 +523,14 @@ with tab3:
         
         # Calculate Attendance Metrics (Presence vs Total Days)
         total_days = trainer_df['Date_Obj'].nunique()
-        leave_days = trainer_df[trainer_df['Attendance'] == 'L']['Date_Obj'].nunique()
-        # Assume 'P' or 'WO' or any check-in implies presence relative to leave? 
-        # Usually Attendance Rate = 100 - Leave Rate? Or specifically 'P' days.
-        # Let's use explicit 'P' count for Attendance Rate.
-        present_days = trainer_df[trainer_df['Attendance'] == 'P']['Date_Obj'].nunique()
         
+        # Count leave days - check for 'L' in Attendance column
+        leave_days = trainer_df[trainer_df['Attendance'].str.upper() == 'L']['Date_Obj'].nunique()
+        
+        # Count present days - check for 'P' in Attendance column
+        present_days = trainer_df[trainer_df['Attendance'].str.upper() == 'P']['Date_Obj'].nunique()
+        
+        # Calculate rates
         leave_rate = (leave_days / total_days * 100) if total_days > 0 else 0
         p_attendance = (present_days / total_days * 100) if total_days > 0 else 0
 
